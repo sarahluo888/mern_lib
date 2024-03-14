@@ -26,7 +26,7 @@ const ReportModal = ({ isOpen, onRequestClose, report, filteredBooks }) => {
       <h2>Report</h2>
       <div>
         <p>Total Books: {report.totalBooks}</p>
-        <p>Total Holds: {report.totalHolds}</p>
+        <p>Max Holds: {report.maxHolds}</p>
         <p>Average Page Number: {report.avgPageNumber}</p>
         <p>Average Holds: {report.avgHolds}</p>
       </div>
@@ -130,7 +130,7 @@ export default function BookList() {
     return;
   }, [books.length]);
 
-  // Delete book
+  // delete book
   async function deleteBook(bookId) {
     try {
       await fetch(`http://localhost:5050/books/${bookId}`, {
@@ -162,14 +162,16 @@ export default function BookList() {
       totalPageNumber += Number(filteredBooks[i].pageNumber);
     }
     let totalHolds = 0;
+    let maxHolds = 0;
     for (let i = 0; i < filteredBooks.length; i++) {
+      maxHolds = Math.max(maxHolds, filteredBooks[i].holds);
       totalHolds += Number(filteredBooks[i].holds);
     }
     const avgPageNumber = totalPageNumber / totalBooks || 0;
     const avgHolds = totalHolds / totalBooks || 0;
     
     setReportModalIsOpen(true);
-    setReport({ totalBooks, avgPageNumber, totalHolds, avgHolds });
+    setReport({ totalBooks, avgPageNumber, maxHolds, avgHolds });
     setFilteredBooks(filteredBooks);
   }
 
@@ -190,7 +192,6 @@ export default function BookList() {
     setFilters({ ...filters, [name]: value });
   }
 
-  // This will display the table with the records of individuals.
   return (
     <div>
       <h3>Your Personal Library</h3>
