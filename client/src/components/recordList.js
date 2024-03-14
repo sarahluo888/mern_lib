@@ -1,16 +1,92 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import Modal from "react-modal";
+
+const modalStyles = {
+  content: {
+    top: "50%",
+    left: "50%",
+    right: "auto",
+    bottom: "auto",
+    marginRight: "-50%",
+    transform: "translate(-50%, -50%)",
+    width: "70%",
+    maxWidth: "750px",
+  },
+};
+
+const ReportModal = ({ isOpen, onRequestClose, report, filteredBooks }) => {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onRequestClose={onRequestClose}
+      style={modalStyles}
+      contentLabel="Report Modal"
+    >
+      <h2>Report</h2>
+      <div>
+        <p>Total Books: {report.totalBooks}</p>
+        <p>Total Holds: {report.totalHolds}</p>
+        <p>Average Page Number: {report.avgPageNumber}</p>
+        <p>Average Holds: {report.avgHolds}</p>
+      </div>
+      <h4>Filtered Books</h4>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Author</th>
+            <th>Genre</th>
+            <th>Page Number</th>
+            <th>Availability</th>
+            <th>Holds</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredBooks.map((book) => (
+            <tr key={book._id}>
+              <td>{book.title}</td>
+              <td>{book.author}</td>
+              <td>{book.genre}</td>
+              <td>{book.pageNumber}</td>
+              <td>{book.availability ? "Available" : "Not Available"}</td>
+              <td>{book.holds}</td>
+
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button
+        onClick={onRequestClose}
+        style={{
+          border: "none",
+          backgroundColor: "#cccdcf",
+          borderRadius: 12,
+        }}
+        onMouseEnter={(e) => { e.target.style.backgroundColor = "#8c8c8c"; }}
+        onMouseLeave={(e) => { e.target.style.backgroundColor = "#cccdcf"; }}
+      >
+        Close
+      </button>
+    </Modal>
+  );
+};
 
 const BookEntry = (props) => (
   <tr>
     <td>{props.book.title}</td>
     <td>{props.book.author}</td>
     <td>{props.book.genre}</td>
-    <td>{props.book.publicationYear}</td>
+    <td>{props.book.pageNumber}</td>
     <td>{props.book.availability ? "Available" : "Not Available"}</td>
+    <td>{props.book.holds}</td>
     <td>
-      <Link className="btn btn-link" to={`/edit/${props.book._id}`}>Edit</Link> |
-      <button className="btn btn-link"
+      <Link className="btn btn-link" to={`/edit/${props.book._id}`}>
+        Edit
+      </Link>{" "}
+      |
+      <button
+        className="btn btn-link"
         onClick={() => {
           props.deleteBook(props.book._id);
         }}
@@ -19,67 +95,46 @@ const BookEntry = (props) => (
       </button>
     </td>
   </tr>
-//  <tr>
-//    <td>{props.record.name}</td>
-//    <td>{props.record.position}</td>
-//    <td>{props.record.level}</td>
-//    <td>
-//      <Link className="btn btn-link" to={`/edit/${props.record._id}`}>Edit</Link> |
-//      <button className="btn btn-link"
-//        onClick={() => {
-//          props.deleteRecord(props.record._id);
-//        }}
-//      >
-//        Delete
-//      </button>
-//    </td>
-//  </tr>
 );
 
 export default function BookList() {
   const [books, setBooks] = useState([]);
+  const [filteredBooks, setFilteredBooks] = useState([]);
+  const [authors, setAuthors] = useState([]);
+  const [genres, setGenres] = useState([]);
+  const [reportModalIsOpen, setReportModalIsOpen] = useState(false);
+  const [report, setReport] = useState([]);
+  const [filters, setFilters] = useState({
+    genre: "",
+    availability: "",
+    author: "",
+  });
 
-  // Fetch books from the database
-  // useEffect(() => {
-  //   async function fetchBooks() {
-  //     try {
-  //       const response = await fetch("http://localhost:5050/books");
-  //       if (!response.ok) {
-  //         throw new Error(`HTTP error! status: ${response.status}`);
-  //       }
-  //       const data = await response.json();
-  //       setBooks(data);
-  //     } catch (error) {
-  //       console.error("Error fetching books:", error);
-  //     }
-  //   }
+  useEffect(() => {
+    async function getBooks() {
+      const response = await fetch(`http://localhost:5050/books/`);
+      if (!response.ok) {
+        const message = `An error occurred: ${response.statusText}`;
+        window.alert(message);
+        return;
+      }
 
-  //   fetchBooks();
-  // }, []);
-
-   useEffect(() => {
-   async function getBooks() {
-     const response = await fetch(`http://localhost:5050/books/`);
-     if (!response.ok) {
-       const message = `An error occurred: ${response.statusText}`;
-       window.alert(message);
-       return;
-     }
-
-     const data = await response.json();
-     setBooks(data);
-   }
-
-   getBooks();
-
-   return;
- }, [books.length]);
+      const data = await response.json();
+      const uniqueAuthors = [...new Set(data.map(book => book.author))];
+      setAuthors(uniqueAuthors);
+      const uniqueGenres = [...new Set(data.map(book => book.genre))];
+      setGenres(uniqueGenres);
+      setBooks(data);
+    }
+    getBooks();
+    return;
+  }, [books.length]);
 
   // Delete book
   async function deleteBook(bookId) {
     try {
       await fetch(`http://localhost:5050/books/${bookId}`, {
-        method: "DELETE"
+        method: "DELETE",
       });
       setBooks(books.filter((book) => book._id !== bookId));
     } catch (error) {
@@ -87,78 +142,135 @@ export default function BookList() {
     }
   }
 
-// export default function RecordList() {
-//  const [records, setRecords] = useState([]);
+  async function genReport() {
+    let filteredBooks = books;
 
-//  // This method fetches the records from the database.
-//  useEffect(() => {
-//    async function getRecords() {
-//      const response = await fetch(`http://localhost:5050/record/`);
+    if (filters.genre) {
+      filteredBooks = filteredBooks.filter((book) => book.genre === filters.genre);
+    }
+    if (filters.availability !== "") {
+      const availability = filters.availability === "true";
+      filteredBooks = filteredBooks.filter((book) => book.availability === availability);
+    }
+    if (filters.author) {
+      filteredBooks = filteredBooks.filter((book) => book.author === filters.author);
+    }
+  
+    const totalBooks = filteredBooks.length;
+    let totalPageNumber = 0;
+    for (let i = 0; i < filteredBooks.length; i++) {
+      totalPageNumber += Number(filteredBooks[i].pageNumber);
+    }
+    let totalHolds = 0;
+    for (let i = 0; i < filteredBooks.length; i++) {
+      totalHolds += Number(filteredBooks[i].holds);
+    }
+    const avgPageNumber = totalPageNumber / totalBooks || 0;
+    const avgHolds = totalHolds / totalBooks || 0;
+    
+    setReportModalIsOpen(true);
+    setReport({ totalBooks, avgPageNumber, totalHolds, avgHolds });
+    setFilteredBooks(filteredBooks);
+  }
 
-//      if (!response.ok) {
-//        const message = `An error occurred: ${response.statusText}`;
-//        window.alert(message);
-//        return;
-//      }
+  function renderBookList() {
+    return books.map((book) => {
+      return (
+        <BookEntry
+          book={book}
+          deleteBook={() => deleteBook(book._id)}
+          key={book._id}
+        />
+      );
+    });
+  }
 
-//      const records = await response.json();
-//      setRecords(records);
-//    }
+  function handleFilterChange(event) {
+    const { name, value } = event.target;
+    setFilters({ ...filters, [name]: value });
+  }
 
-//    getRecords();
-
-//    return;
-//  }, [records.length]);
-
-//  // This method will delete a record
-//  async function deleteRecord(id) {
-//    await fetch(`http://localhost:5050/record/${id}`, {
-//      method: "DELETE"
-//    });
-
-//    const newRecords = records.filter((el) => el._id !== id);
-//    setRecords(newRecords);
-//  }
-
- // This method will map out the records on the table
-//  function recordList() {
-//    return records.map((record) => {
-//      return (
-//        <Record
-//          record={record}
-//          deleteRecord={() => deleteRecord(record._id)}
-//          key={record._id}
-//        />
-//      );
-//    });
-//  }
-function renderBookList() {
-  return books.map((book) => 
- { return (  <BookEntry
-      book={book}
-      deleteBook={() => deleteBook(book._id)}
-      key={book._id}
-    />)}
+  // This will display the table with the records of individuals.
+  return (
+    <div>
+      <h3>Your Personal Library</h3>
+      <h5 style={{ marginTop: 30 }}>Filters</h5>
+      <div className="filters">
+        <label style={{ marginRight: 20 }}>
+          Genre:
+          <select
+            name="genre"
+            value={filters.genre}
+            onChange={handleFilterChange}
+          >
+            <option value="">All</option>
+            {genres.map((genre) => (
+              <option key={genre} value={genre}>
+                {genre}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={{ marginRight: 20 }}>
+          Availability:
+          <select
+            name="availability"
+            value={filters.availability}
+            onChange={handleFilterChange}
+          >
+            <option value="">All</option>
+            <option value="true">Available</option>
+            <option value="false">Not Available</option>
+          </select>
+        </label>
+        <label style={{ marginRight: 20 }}>
+          Author:
+          <select
+            name="author"
+            value={filters.author}
+            onChange={handleFilterChange}
+          >
+            <option value="">All</option>
+            {authors.map((author) => (
+              <option key={author} value={author}>
+                {author}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          onClick={genReport}
+          style={{
+            border: "none",
+            backgroundColor: "#cccdcf",
+            borderRadius: 12,
+          }}
+          onMouseEnter={(e) => { e.target.style.backgroundColor = "#8c8c8c"; }}
+          onMouseLeave={(e) => { e.target.style.backgroundColor = "#cccdcf"; }}
+        >
+          Generate Report
+        </button>
+        <ReportModal
+  isOpen={reportModalIsOpen}
+  onRequestClose={() => setReportModalIsOpen(false)}
+  report={report}
+  filteredBooks={filteredBooks}
+/>
+      </div>
+      <table className="table" style={{ marginTop: 20 }}>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Author</th>
+            <th>Genre</th>
+            <th>Page Number</th>
+            <th>Availability</th>
+            <th>Holds</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>{renderBookList()}</tbody>
+      </table>
+    </div>
   );
-}
-
- // This will display the table with the records of individuals.
- return (
-  <div>
-  <h3>Book List</h3>
-  <table className="table" style={{ marginTop: 20 }}>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Author</th>
-        <th>Genre</th>
-        <th>Publication Year</th>
-        <th>Availability</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>{renderBookList()}</tbody>
-  </table>
-</div>
- );
 }
