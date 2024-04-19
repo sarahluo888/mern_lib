@@ -9,14 +9,14 @@ const router = express.Router();
 //   console.log(post.name)
 // }
 
-// This section will help you get a list of all the records.
+// get a list of all the records.
 router.get("/", async (req, res) => {
   let collection = await db.collection("book");
   let results = await collection.find({}).toArray();
   res.send(results).status(200);
 });
 
-// This section will help you get a single record by id
+// get a single record by id
 router.get("/:id", async (req, res) => {
   let collection = await db.collection("book");
   let query = { _id: new ObjectId(req.params.id) };
@@ -26,7 +26,7 @@ router.get("/:id", async (req, res) => {
   else res.send(result).status(200);
 });
 
-// This section will help you create a new record.
+// create a new record
 router.post("/", async (req, res) => {
   let newDocument = {
     title: req.body.title,
@@ -34,12 +34,13 @@ router.post("/", async (req, res) => {
     genre: req.body.genre,
     pageNumber: req.body.pageNumber,
     availability: req.body.availability,
+    holds: req.body.holds,
   };
   let collection = await db.collection("book");
   const authorCollection = await db.collection("author");
   const genreCollection = await db.collection("genre");
 
-  // Check if author exists
+  // check if author exists
   const existingAuthor = await authorCollection.findOne({
     name: req.body.author,
   });
@@ -58,7 +59,7 @@ router.post("/", async (req, res) => {
   res.send(result).status(204);
 });
 
-// This section will help you update a record by id.
+// update a record by id.
 router.patch("/:id", async (req, res) => {
   const query = { _id: new ObjectId(req.params.id) };
   const bookCollection = await db.collection("book");
@@ -75,6 +76,7 @@ router.patch("/:id", async (req, res) => {
       genre: req.body.genre,
       pageNumber: req.body.pageNumber,
       availability: req.body.availability,
+      holds: req.body.holds,
     },
   };
   let result = await bookCollection.updateOne(query, updates);
@@ -103,7 +105,7 @@ router.patch("/:id", async (req, res) => {
   res.send(result).status(200);
 });
 
-// This section will help you delete a record
+// delete a record
 router.delete("/:id", async (req, res) => {
   const query = { _id: new ObjectId(req.params.id) };
 
@@ -131,6 +133,24 @@ if (otherBooksInGenre.length === 0) {
 }
 
   res.send(result).status(200);
+});
+
+collection.createIndex( { genre : -1 }, function(err, genre_index) {
+   console.log(genre_index);
+   // creates a single key descending index on the name field
+   callback(genre_index);
+});
+
+collection.createIndex( { author : -1 }, function(err, author_index) {
+   console.log(author_index);
+   // descending index on the author field
+   callback(author_index);
+});
+
+collection.createIndex( { holds : 1 }, function(err, holds_index) {
+   console.log(holds_index);
+   // single key ascending index on the holds field
+   callback(holds_index);
 });
 
 export default router;
